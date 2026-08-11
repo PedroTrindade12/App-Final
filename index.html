@@ -888,6 +888,168 @@ function AreaPet({ pets, setPets, accent }) {
     </div>
   );
 }
+/* ================= HÁBITOS (aba exclusiva da Mariana) ================= */
+const CORES_HABITO = ["#38bdf8","#fb923c","#a855f7","#ef4444","#22c55e","#14b8a6","#eab308"];
+
+function diasAtras(qtd) {
+  const out = [];
+  for (let i = qtd - 1; i >= 0; i--) out.push(addDays(hoje(), -i));
+  return out;
+}
+
+function calcularStreaks(itemId, registros) {
+  // percorre os últimos 400 dias pra achar a sequência atual e o recorde
+  let atual = 0, recorde = 0, corrente = 0;
+  let d = hoje();
+  // sequência atual: conta pra trás a partir de hoje (ou ontem, se hoje ainda não foi feito)
+  let cursor = hoje();
+  if (!registros[cursor]?.[itemId]) cursor = addDays(cursor, -1);
+  while (registros[cursor]?.[itemId]) { atual++; cursor = addDays(cursor, -1); }
+  // maior sequência histórica, varrendo os últimos 365 dias
+  const todos = diasAtras(365);
+  todos.forEach((dia) => {
+    if (registros[dia]?.[itemId]) { corrente++; recorde = Math.max(recorde, corrente); }
+    else corrente = 0;
+  });
+  return { atual, recorde };
+}
+
+function Habitos({ habitos, setHabitos, accent }) {
+  const grupos = habitos.grupos || [];
+  const itens = habitos.itens || [];
+  const registros = habitos.registros || {};
+  const [showForm, setShowForm] = useState(false);
+  const [showOverview, setShowOverview] = useState(false);
+  const [editando, setEditando] = useState(null);
+
+  const [nome, setNome] = useState(""); const [descricao, setDescricao] = useState("");
+  const [cor, setCor] = useState(CORES_HABITO[0]); const [grupoId, setGrupoId] = useState("");
+  const [novoGrupoNome, setNovoGrupoNome] = useState("");
+
+  const abrirNovo = () => { setEditando(null); setNome(""); setDescricao(""); setCor(CORES_HABITO[0]); setGrupoId(grupos[0]?.id || ""); setShowForm(true); };
+  const abrirEdicao = (it) => { setEditando(it.id); setNome(it.nome); setDescricao(it.descricao||""); setCor(it.cor); setGrupoId(it.grupoId||""); setShowForm(true); };
+
+  const salvarItem = () => {
+    if (!nome.trim()) return;
+    let gId = grupoId;
+    if (novoGrupoNome.trim()) {
+      const novoGrupo = { id: uid(), nome: novoGrupoNome.trim(), cor };
+      setHabitos({ ...habitos, grupos: [...grupos, novoGrupo] });
+      gId = novoGrupo.id;
+    }
+    if (editando) {
+      setHabitos((h) => ({ ...h, itens: h.itens.map(it => it.id===editando ? { ...it, nome: nome.trim(), descricao: descricao.trim(), cor, grupoId: gId } : it) }));
+    } else {
+      setHabitos((h) => ({ ...h, itens: [...h.itens, { id: uid(), nome: nome.trim(), descricao: descricao.trim(), cor, grupoId: gId }] }));
+    }
+    setShowForm(false); setNovoGrupoNome("");
+  };
+  const excluirItem = (id) => setHabitos((h) => ({ ...h, itens: h.itens.filter(it=>it.id!==id) }));
+
+  const toggleHoje = (itemId) => {
+    const d = hoje();
+    const diaAtual = { ...(registros[d] || {}) };
+    diaAtual[itemId] = !diaAtual[itemId];
+    setHabitos({ ...habitos, registros: { ...registros, [d]: diaAtual } });
+  };
+
+  const porGrupo = useMemo(() => {
+    const semGrupo = itens.filter(it => !it.grupoId || !grupos.find(g=>g.id===it.grupoId));
+    const grupados = grupos.map(g => ({ grupo: g, lista: itens.filter(it => it.grupoId===g.id) })).filter(g=>g.lista.length>0);
+    return semGrupo.length ? [...grupados, { grupo: null, lista: semGrupo }] : grupados;
+  }, [itens, grupos]);
+
+  const diasHeatmap = diasAtras(70);
+  const totalHabitos = itens.length || 1;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <button onClick={() => setShowOverview(!showOverview)} className="flex-1 py-2 rounded-lg text-xs font-medium" style={showOverview?{background:"#1e293b",color:accent}:{background:"#0f172a",color:"#64748b"}}>
+          <Ic.Chart size={12}/> Visão geral
+        </button>
+        <button onClick={abrirNovo} className="flex-1 py-2 rounded-lg text-xs font-semibold" style={{background:accent,color:"#020617"}}>
+          <Ic.Plus size={12}/> Novo hábito
+        </button>
+      </div>
+
+      {showOverview && (
+        <Card>
+          <Titulo icon={Ic.Chart} accent={accent}>Últimos 70 dias</Titulo>
+          <div className="grid gap-1" style={{gridTemplateColumns:"repeat(10, 1fr)"}}>
+            {diasHeatmap.map((d) => {
+              const feitos = itens.filter(it => registros[d]?.[it.id]).length;
+              const pct = feitos / totalHabitos;
+              const cor2 = pct===0 ? "#1e293b" : pct<0.34 ? "#14532d" : pct<0.67 ? "#16a34a" : "#4ade80";
+              return <div key={d} title={`${longo(d)}: ${feitos}/${itens.length}`} className="aspect-square rounded-sm" style={{background:cor2}} />;
+            })}
+          </div>
+          <div className="flex items-center justify-end gap-1 mt-2 text-[10px] text-slate-500">
+            menos <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{background:"#1e293b"}}/>
+            <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{background:"#14532d"}}/>
+            <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{background:"#16a34a"}}/>
+            <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{background:"#4ade80"}}/> mais
+          </div>
+        </Card>
+      )}
+
+      {showForm && (
+        <Card>
+          <Titulo icon={Ic.Edit} accent={accent}>{editando ? "Editar hábito" : "Novo hábito"}</Titulo>
+          <input value={nome} onChange={(e)=>setNome(e.target.value)} placeholder="Nome do hábito" className="w-full bg-slate-800 rounded-lg px-3 py-2 text-sm outline-none mb-2" />
+          <input value={descricao} onChange={(e)=>setDescricao(e.target.value)} placeholder="Descrição (opcional)" className="w-full bg-slate-800 rounded-lg px-3 py-2 text-sm outline-none mb-2" />
+          <div className="flex gap-2 mb-2">
+            {CORES_HABITO.map(c => (
+              <button key={c} onClick={()=>setCor(c)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{background:c}}>
+                {cor===c && <span style={{color:"#020617"}}>✓</span>}
+              </button>
+            ))}
+          </div>
+          <select value={grupoId} onChange={(e)=>setGrupoId(e.target.value)} className="w-full bg-slate-800 rounded-lg px-3 py-2 text-sm outline-none mb-2">
+            <option value="">Sem grupo</option>
+            {grupos.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
+          </select>
+          <input value={novoGrupoNome} onChange={(e)=>setNovoGrupoNome(e.target.value)} placeholder="ou crie um grupo novo (opcional)" className="w-full bg-slate-800 rounded-lg px-3 py-2 text-sm outline-none mb-2" />
+          <div className="flex gap-2">
+            <button onClick={()=>setShowForm(false)} className="flex-1 bg-slate-800 rounded-lg py-2 text-sm">Cancelar</button>
+            <button onClick={salvarItem} className="flex-1 rounded-lg py-2 text-sm font-semibold" style={{background:accent,color:"#020617"}}>Salvar</button>
+          </div>
+          {editando && <button onClick={()=>{excluirItem(editando);setShowForm(false);}} className="w-full mt-2 text-xs text-red-400">Excluir hábito</button>}
+        </Card>
+      )}
+
+      {itens.length===0 && !showForm && <p className="text-slate-500 text-sm text-center py-6">Nenhum hábito ainda — toca em "Novo hábito" pra começar.</p>}
+
+      {porGrupo.map(({ grupo, lista }) => (
+        <Card key={grupo?.id || "sem-grupo"}>
+          {grupo && <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{color:grupo.cor}}>{grupo.nome}</div>}
+          <div className="space-y-2">
+            {lista.map((it) => {
+              const feito = !!registros[hoje()]?.[it.id];
+              const { atual, recorde } = calcularStreaks(it.id, registros);
+              return (
+                <div key={it.id} className="flex items-center gap-3 bg-slate-800/50 rounded-xl px-3 py-2.5">
+                  <button onClick={() => toggleHoje(it.id)} className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 font-bold text-sm"
+                    style={feito ? { background: it.cor, color: "#020617" } : { border: `2px solid ${it.cor}`, color: it.cor }}>
+                    {atual > 0 ? atual : "○"}
+                  </button>
+                  <button onClick={() => abrirEdicao(it)} className="flex-1 text-left min-w-0">
+                    <div className="text-sm text-slate-200 truncate">{it.nome}</div>
+                    {it.descricao && <div className="text-[10px] text-slate-500 truncate">{it.descricao}</div>}
+                  </button>
+                  <div className="text-right shrink-0">
+                    <div className="text-[10px] text-slate-500">recorde</div>
+                    <div className="text-xs font-semibold text-slate-300">{recorde}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
 /* ================= APP PRINCIPAL ================= */
 const KEY = "trindade:v1";
 const DEFAULT_EXPENSES_PEDRO = [
@@ -914,6 +1076,7 @@ function pessoaDefault(sexo, kcalMin, isPedro) {
       : { expenses: [], investments: [], baseInvested: 0, monthlyTarget: 0, returnRate: 0.008 },
     estudo: { itens: [], dias: {}, aulas: [] },
     trabalho: isPedro ? { itens: [] } : undefined,
+    habitos: !isPedro ? { grupos: [], itens: [], registros: {} } : undefined,
   };
 }
 function defaultData() {
@@ -981,6 +1144,7 @@ function TrindadeApp() {
 
   const setTarefas = (val) => setData(d => ({...d, [activePerson]: {...d[activePerson], tarefas: val}}));
   const setTrabalho = (val) => setData(d => ({...d, [activePerson]: {...d[activePerson], trabalho: val}}));
+  const setHabitos = (val) => setData(d => ({...d, [activePerson]: {...d[activePerson], habitos: typeof val === "function" ? val(d[activePerson].habitos) : val}}));
   const setEstudoTarefas = (val) => setData(d => ({...d, [activePerson]: {...d[activePerson], estudo: {...d[activePerson].estudo, itens: val.itens, dias: val.dias}}}));
   const setAulas = (val) => setData(d => ({...d, [activePerson]: {...d[activePerson], estudo: {...d[activePerson].estudo, aulas: val}}}));
 
@@ -1034,6 +1198,7 @@ function TrindadeApp() {
     { k:"financeiro", l:"Financeiro", icon: Ic.Money },
     { k:"estudo", l:"Estudo", icon: Ic.Study },
     ...(P.trabalho ? [{ k:"trabalho", l:"Trabalho", icon: Ic.Work }] : []),
+    ...(P.habitos ? [{ k:"habitos", l:"Hábitos", icon: Ic.Check }] : []),
     { k:"casal", l:"Casal", icon: Ic.Heart },
     { k:"pet", l:"Pet", icon: Ic.Pet },
   ];
@@ -1115,6 +1280,8 @@ function TrindadeApp() {
         )}
 
         {area==="trabalho" && P.trabalho && <ChecklistDiario bucket={P.trabalho} setBucket={setTrabalho} accent={accent} corAtraso={false} />}
+
+        {area==="habitos" && P.habitos && <Habitos habitos={P.habitos} setHabitos={setHabitos} accent={accent} />}
 
         {area==="casal" && <DiarioCasal entradas={data.relacionamento} setEntradas={setRelacionamento} activePerson={activePerson} accent={accent} />}
 
