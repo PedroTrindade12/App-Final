@@ -29,9 +29,6 @@
 <div id="root"></div>
 
 <script>
-  // shim: emula a API window.storage usada no artifact do Claude, gravando
-  // no Firebase Realtime Database (no "trindade") -- sincroniza entre os
-  // celulares do Pedro e da Mariana.
   const FIREBASE_URL = "https://apps-5716a-default-rtdb.firebaseio.com";
   const sanitize = (k) => k.replace(/[.#$\[\]:]/g, "_");
 
@@ -76,7 +73,7 @@
   }
 </script>
 
-<script type="text/babel" data-presets="react">
+<script id="app-code" type="text/plain">
 const { useState, useEffect, useMemo, useRef } = React;
 const { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid, BarChart, Bar } = Recharts;
 
@@ -1131,9 +1128,34 @@ function TrindadeApp() {
   );
 }
 
-
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<TrindadeApp />);
 </script>
+<script>
+  function mostrarErro(titulo, err) {
+    var root = document.getElementById("root");
+    var msg = (err && (err.stack || err.message)) ? (err.stack || err.message) : String(err);
+    root.innerHTML =
+      '<div style="padding:20px;font-family:monospace;color:#fca5a5;background:#020617;min-height:100vh;">' +
+      '<div style="color:#f87171;font-weight:bold;margin-bottom:10px;font-size:14px;">' + titulo + '</div>' +
+      '<pre style="white-space:pre-wrap;font-size:11px;line-height:1.5;background:#111827;padding:12px;border-radius:8px;">' +
+      msg.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;") +
+      '</pre></div>';
+  }
+  window.addEventListener("error", function(e) {
+    if (!document.getElementById("root").innerHTML) mostrarErro("Erro de execução:", e.error || e.message);
+  });
+  window.addEventListener("unhandledrejection", function(e) {
+    if (!document.getElementById("root").innerHTML) mostrarErro("Erro (promise):", e.reason);
+  });
+  try {
+    var src = document.getElementById("app-code").textContent;
+    var output = Babel.transform(src, { presets: ["react"] }).code;
+    var script = document.createElement("script");
+    script.textContent = output + "\n\nconst root = ReactDOM.createRoot(document.getElementById('root')); root.render(React.createElement(TrindadeApp));";
+    document.body.appendChild(script);
+  } catch (err) {
+    mostrarErro("Erro ao processar o código (sintaxe):", err);
+  }
+</script>
+
 </body>
 </html>
