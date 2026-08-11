@@ -967,14 +967,12 @@ function TrindadeApp() {
     setNotifOn(perm === "granted");
   };
 
-  if (loading || !data) return <div className="min-h-screen bg-slate-950 text-slate-400 flex items-center justify-center">Carregando…</div>;
-
-  const P = data[activePerson];
+  const P = data ? data[activePerson] : null;
   const theme = THEMES[activePerson];
   const accent = theme.accent;
 
   const setPerfilSaude = (campo, val) => setData(d => ({...d, [activePerson]: {...d[activePerson], saude: {...d[activePerson].saude, perfil: {...d[activePerson].saude.perfil, [campo]: val}}}}));
-  const diaSaudeHoje = P.saude.dias[hoje()] || novoDiaSaude();
+  const diaSaudeHoje = P ? (P.saude.dias[hoje()] || novoDiaSaude()) : novoDiaSaude();
   const setDiaSaude = (campo, val) => setData(d => {
     const dias = {...d[activePerson].saude.dias, [hoje()]: {...(d[activePerson].saude.dias[hoje()]||novoDiaSaude()), [campo]: val}};
     return {...d, [activePerson]: {...d[activePerson], saude: {...d[activePerson].saude, dias}}};
@@ -995,15 +993,16 @@ function TrindadeApp() {
   const setRelacionamento = (val) => setData(d => ({...d, relacionamento: val}));
   const setPets = (val) => setData(d => ({...d, pets: val}));
 
-  const totalExpenses = P.financeiro.expenses.reduce((s,e)=>s+n(e.amount),0);
-  const totalContributed = P.financeiro.investments.reduce((s,i)=>s+n(i.amount),0);
-  const totalInvested = P.financeiro.baseInvested + totalContributed;
+  const totalExpenses = P ? P.financeiro.expenses.reduce((s,e)=>s+n(e.amount),0) : 0;
+  const totalContributed = P ? P.financeiro.investments.reduce((s,i)=>s+n(i.amount),0) : 0;
+  const totalInvested = P ? P.financeiro.baseInvested + totalContributed : 0;
   const thisMonth = mesAtual();
-  const monthContrib = P.financeiro.investments.filter(i=>i.month===thisMonth).reduce((s,i)=>s+n(i.amount),0);
-  const byCategory = CAT_LIST.map(cat => ({cat, total: P.financeiro.expenses.filter(e=>e.category===cat).reduce((s,e)=>s+n(e.amount),0)})).filter(c=>c.total>0);
+  const monthContrib = P ? P.financeiro.investments.filter(i=>i.month===thisMonth).reduce((s,i)=>s+n(i.amount),0) : 0;
+  const byCategory = P ? CAT_LIST.map(cat => ({cat, total: P.financeiro.expenses.filter(e=>e.category===cat).reduce((s,e)=>s+n(e.amount),0)})).filter(c=>c.total>0) : [];
 
   /* -------- alertas: tarefas atrasadas, exames fora da faixa, meta financeira em risco -------- */
   const alertas = useMemo(() => {
+    if (!P) return [];
     const lista = [];
     const horaAtual = horaAgora(); const diaHoje = hoje();
     (P.tarefas.itens||[]).forEach(it => {
@@ -1020,12 +1019,14 @@ function TrindadeApp() {
   }, [P, monthContrib]);
 
   useEffect(() => {
-    if (!notifOn || alertas.length===0 || !("serviceWorker" in navigator)) return;
+    if (!P || !notifOn || alertas.length===0 || !("serviceWorker" in navigator)) return;
     navigator.serviceWorker.ready.then(reg => {
       reg.showNotification(`Trindade — ${theme.label}`, { body: alertas.slice(0,3).join("\n"), icon: "icon-192.png" });
     }).catch(()=>{});
     // eslint-disable-next-line
   }, [activePerson]);
+
+  if (loading || !data || !P) return <div className="min-h-screen bg-slate-950 text-slate-400 flex items-center justify-center">Carregando…</div>;
 
   const AREAS = [
     { k:"saude", l:"Saúde", icon: Ic.Health },
