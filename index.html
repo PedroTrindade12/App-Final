@@ -1039,14 +1039,8 @@ function TrindadeApp() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 pb-8">
+    <div className="min-h-screen bg-slate-950 text-slate-100" style={{paddingBottom:"calc(84px + env(safe-area-inset-bottom))"}}>
       <div className="px-4 pt-5 pb-3">
-        <div className="flex gap-2 mb-4">
-          {Object.entries(THEMES).map(([k,t]) => (
-            <button key={k} onClick={()=>setActivePerson(k)} className="flex-1 py-2 rounded-xl text-sm font-semibold transition"
-              style={activePerson===k ? {background:t.accent, color:"#020617"} : {background:"#1e293b", color:"#94a3b8"}}>{t.label}</button>
-          ))}
-        </div>
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-xl font-bold" style={{fontFamily:"'Fraunces',serif"}}>Trindade</h1>
           <button onClick={pedirNotificacao} className="text-xs px-2 py-1 rounded-lg flex items-center gap-1" style={{background: notifOn ? "rgba(74,222,128,0.15)" : "#1e293b", color: notifOn ? "#4ade80" : "#94a3b8"}}>
@@ -1125,6 +1119,35 @@ function TrindadeApp() {
         {area==="casal" && <DiarioCasal entradas={data.relacionamento} setEntradas={setRelacionamento} activePerson={activePerson} accent={accent} />}
 
         {area==="pet" && <AreaPet pets={data.pets} setPets={setPets} accent={accent} />}
+      </div>
+
+      <div
+        style={{
+          position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50,
+          display: "flex", background: "rgba(2,6,23,0.92)", backdropFilter: "blur(14px)",
+          WebkitBackdropFilter: "blur(14px)", borderTop: "1px solid #1e293b",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
+        {Object.entries(THEMES).map(([k, t]) => {
+          const ativo = activePerson === k;
+          return (
+            <button
+              key={k}
+              onClick={() => setActivePerson(k)}
+              className="flex-1 flex flex-col items-center justify-center gap-0.5"
+              style={{ padding: "9px 0 7px", color: ativo ? t.accent : "#64748b" }}
+            >
+              <span
+                className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+                style={ativo ? { background: t.accent, color: "#020617" } : { background: "#1e293b", color: "#64748b" }}
+              >
+                {t.label[0]}
+              </span>
+              <span className="text-[11px] font-medium">{t.label}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
