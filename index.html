@@ -139,7 +139,7 @@ function Titulo({ icon: Icon, children, accent, extra }) {
 const Num = (p) => <input type="number" inputMode="decimal" {...p} className={`bg-slate-800 rounded-lg px-3 py-2 text-sm w-full outline-none focus:ring-1 focus:ring-slate-600 ${p.className || ""}`} />;
 function Aviso({ children }) { return <p className="mt-2 text-[11px] text-amber-400 flex gap-1.5"><Ic.Warn size={13} className="shrink-0 mt-0.5" /><span>{children}</span></p>; }
 
-function SaudeHoje({ P, D, setPerfilCampo, setDiaCampo, accent }) {
+function SaudeHoje({ P, D, dia, onDia, setPerfilCampo, setDiaCampo, accent }) {
   const completo = n(P.idade) > 0 && n(P.altura) > 0 && n(P.pesoInicial) > 0 && n(P.meta) > 0;
   const pesoAtualAux = n(D.peso) > 0 ? n(D.peso) : n(P.pesoInicial);
   const calc = (rec, kg) => {
@@ -173,6 +173,12 @@ function SaudeHoje({ P, D, setPerfilCampo, setDiaCampo, accent }) {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-3 py-2">
+        <button onClick={() => onDia(addDays(dia, -1))} className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center active:scale-95"><Ic.Left size={16}/></button>
+        <div className="text-sm font-medium">{dia === hoje() ? "Hoje" : longo(dia)}</div>
+        <button onClick={() => onDia(addDays(dia, 1))} disabled={dia >= hoje()} className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center active:scale-95 disabled:opacity-30"><Ic.Right size={16}/></button>
+      </div>
+
       {!completo && (
         <div className="w-full flex items-center gap-2 bg-amber-500/15 border border-amber-500/40 text-amber-300 rounded-2xl p-3 text-sm">
           <Ic.Warn size={18} className="shrink-0" /><span>Complete o perfil (aba Perfil) pra calcular o gasto calórico.</span>
@@ -299,17 +305,30 @@ function SaudeHistorico({ P, accent }) {
           </ResponsiveContainer></div>
         )}
       </Card>
-      {pesos.some(p=>p.gordPct||p.massa) && (
+      {pesos.some(p=>p.massa) && (
         <Card>
-          <Titulo icon={Ic.Chart} accent={accent}>Composição corporal</Titulo>
-          <div className="h-44 -ml-2"><ResponsiveContainer width="100%" height="100%">
+          <Titulo icon={Ic.Chart} accent={accent}>Massa magra (kg)</Titulo>
+          <div className="h-40 -ml-2"><ResponsiveContainer width="100%" height="100%">
             <LineChart data={pesos}>
               <CartesianGrid stroke="#1e293b" vertical={false} />
               <XAxis dataKey="d" tick={{fontSize:10,fill:"#64748b"}} />
-              <YAxis tick={{fontSize:10,fill:"#64748b"}} width={35} />
+              <YAxis tick={{fontSize:10,fill:"#64748b"}} width={35} domain={["dataMin - 1","dataMax + 1"]} />
               <Tooltip contentStyle={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,fontSize:12}} />
-              <Line type="monotone" dataKey="gordPct" name="Gordura %" stroke="#fb923c" strokeWidth={2} dot={{r:2}} connectNulls />
-              <Line type="monotone" dataKey="massa" name="Massa kg" stroke="#34d399" strokeWidth={2} dot={{r:2}} connectNulls />
+              <Line type="monotone" dataKey="massa" stroke="#34d399" strokeWidth={2} dot={{r:3}} connectNulls />
+            </LineChart>
+          </ResponsiveContainer></div>
+        </Card>
+      )}
+      {pesos.some(p=>p.gordPct) && (
+        <Card>
+          <Titulo icon={Ic.Chart} accent={accent}>Gordura (%)</Titulo>
+          <div className="h-40 -ml-2"><ResponsiveContainer width="100%" height="100%">
+            <LineChart data={pesos}>
+              <CartesianGrid stroke="#1e293b" vertical={false} />
+              <XAxis dataKey="d" tick={{fontSize:10,fill:"#64748b"}} />
+              <YAxis tick={{fontSize:10,fill:"#64748b"}} width={35} domain={["dataMin - 1","dataMax + 1"]} />
+              <Tooltip contentStyle={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,fontSize:12}} />
+              <Line type="monotone" dataKey="gordPct" stroke="#fb923c" strokeWidth={2} dot={{r:3}} connectNulls />
             </LineChart>
           </ResponsiveContainer></div>
         </Card>
@@ -1093,19 +1112,38 @@ function TrindadeApp() {
   const [activePerson, setActivePerson] = useState("pedro");
   const [area, setArea] = useState("saude");
   const [subSaude, setSubSaude] = useState("hoje");
+  const [diaSaude, setDiaSaude_] = useState(hoje());
   const [subFin, setSubFin] = useState("resumo");
   const [subEstudo, setSubEstudo] = useState("tarefas");
   const [loading, setLoading] = useState(true);
   const [notifOn, setNotifOn] = useState(false);
   const primeiro = useRef(true);
+  const defaultsRef = useRef(null);
+  if (!defaultsRef.current) defaultsRef.current = defaultData();
 
   const carregar = async () => {
-    let d = null;
-    try { const r = await window.storage.get(KEY, true); if (r) d = JSON.parse(r.value); } catch(e) { d = null; }
-    const def = defaultData();
-    d = d ? { ...def, ...d, pedro: {...def.pedro, ...(d.pedro||{})}, mariana: {...def.mariana, ...(d.mariana||{})} } : def;
-    primeiro.current = true;
-    setData(d);
+    let fetched = null;
+    try {
+      const r = await window.storage.get(KEY, true);
+      if (r) fetched = JSON.parse(r.value);
+    } catch (e) { fetched = null; }
+
+    setData((prev) => {
+      if (fetched) {
+        const def = defaultsRef.current;
+        primeiro.current = true;
+        return {
+          ...def, ...fetched,
+          pedro: { ...def.pedro, ...(fetched.pedro || {}) },
+          mariana: { ...def.mariana, ...(fetched.mariana || {}) },
+        };
+      }
+      // nada veio do Firebase: se já tem dados carregados na tela, mantém como está
+      // (evita apagar tudo por causa de uma falha passageira de rede)
+      if (prev) return prev;
+      primeiro.current = true;
+      return defaultsRef.current;
+    });
   };
 
   useEffect(() => {
@@ -1135,9 +1173,9 @@ function TrindadeApp() {
   const accent = theme.accent;
 
   const setPerfilSaude = (campo, val) => setData(d => ({...d, [activePerson]: {...d[activePerson], saude: {...d[activePerson].saude, perfil: {...d[activePerson].saude.perfil, [campo]: val}}}}));
-  const diaSaudeHoje = P ? (P.saude.dias[hoje()] || novoDiaSaude()) : novoDiaSaude();
-  const setDiaSaude = (campo, val) => setData(d => {
-    const dias = {...d[activePerson].saude.dias, [hoje()]: {...(d[activePerson].saude.dias[hoje()]||novoDiaSaude()), [campo]: val}};
+  const diaSaudeAtual = P ? (P.saude.dias[diaSaude] || novoDiaSaude()) : novoDiaSaude();
+  const setDiaSaudeCampo = (campo, val) => setData(d => {
+    const dias = {...d[activePerson].saude.dias, [diaSaude]: {...(d[activePerson].saude.dias[diaSaude]||novoDiaSaude()), [campo]: val}};
     return {...d, [activePerson]: {...d[activePerson], saude: {...d[activePerson].saude, dias}}};
   });
   const setExamesSaude = (val) => setData(d => ({...d, [activePerson]: {...d[activePerson], saude: {...d[activePerson].saude, exames: val}}}));
@@ -1237,7 +1275,7 @@ function TrindadeApp() {
                 <button key={k} onClick={()=>setSubSaude(k)} className="flex-1 py-1.5 text-xs rounded-lg font-medium" style={subSaude===k?{background:"#1e293b",color:accent}:{background:"#0f172a",color:"#64748b"}}>{l}</button>
               ))}
             </div>
-            {subSaude==="hoje" && <SaudeHoje P={P.saude.perfil} D={diaSaudeHoje} setPerfilCampo={setPerfilSaude} setDiaCampo={setDiaSaude} accent={accent} />}
+            {subSaude==="hoje" && <SaudeHoje P={P.saude.perfil} D={diaSaudeAtual} dia={diaSaude} onDia={setDiaSaude_} setPerfilCampo={setPerfilSaude} setDiaCampo={setDiaSaudeCampo} accent={accent} />}
             {subSaude==="historico" && <SaudeHistorico P={P.saude.perfil} accent={accent} />}
             {subSaude==="exames" && <SaudeExames exames={P.saude.exames} setExames={setExamesSaude} accent={accent} />}
             {subSaude==="perfil" && <SaudePerfil P={P.saude.perfil} setPerfilCampo={setPerfilSaude} accent={accent} />}
