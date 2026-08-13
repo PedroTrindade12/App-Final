@@ -125,7 +125,7 @@ const burn = (met, min, kg) => (min > 0 && kg > 0 ? Math.round(((met - 1) * 3.5 
 const tmbDe = (kg, alt, idade, sexo) => Math.round(10 * kg + 6.25 * alt - 5 * idade + (sexo === "m" ? 5 : -161));
 
 function novoDiaSaude() { return { agua: 0, musc: 0, muscInt: "moderado", aero: 0, aeroTipo: "caminhada", along: 0, comidas: [], peso: "", gord: "", massa: "" }; }
-function novoPerfilSaude(sexo, kcalMin) { return { sexo, idade: "", altura: "", pesoInicial: "", meta: "", neat: 1.375, metaAgua: "", metaProt: "", kcalMin, dias: {} }; }
+function novoPerfilSaude(sexo, kcalMin) { return { sexo, idade: "", altura: "", pesoInicial: "", meta: "", neat: 1.375, metaAgua: "", metaProt: "", kcalMin }; }
 
 function Card({ children, className = "" }) { return <div className={`bg-slate-900 rounded-2xl p-4 border border-slate-800 ${className}`}>{children}</div>; }
 function Titulo({ icon: Icon, children, accent, extra }) {
@@ -285,8 +285,8 @@ function BlocoTreino({ label, min, onMin, kcal, minMeta, sel, onSel, opts }) {
     </div>
   );
 }
-function SaudeHistorico({ P, accent }) {
-  const diasOrd = useMemo(() => Object.entries(P.dias || {}).sort((a,b)=>a[0].localeCompare(b[0])), [P.dias]);
+function SaudeHistorico({ P, dias, accent }) {
+  const diasOrd = useMemo(() => Object.entries(dias || {}).sort((a,b)=>a[0].localeCompare(b[0])), [dias]);
   const pesos = diasOrd.filter(([,r])=>n(r.peso)>0).map(([d,r])=>({d:curto(d), peso:n(r.peso), gordPct:n(r.gord)||null, massa:n(r.massa)||null}));
   return (
     <div className="space-y-4">
@@ -1276,7 +1276,7 @@ function TrindadeApp() {
               ))}
             </div>
             {subSaude==="hoje" && <SaudeHoje P={P.saude.perfil} D={diaSaudeAtual} dia={diaSaude} onDia={setDiaSaude_} setPerfilCampo={setPerfilSaude} setDiaCampo={setDiaSaudeCampo} accent={accent} />}
-            {subSaude==="historico" && <SaudeHistorico P={P.saude.perfil} accent={accent} />}
+            {subSaude==="historico" && <SaudeHistorico P={P.saude.perfil} dias={P.saude.dias} accent={accent} />}
             {subSaude==="exames" && <SaudeExames exames={P.saude.exames} setExames={setExamesSaude} accent={accent} />}
             {subSaude==="perfil" && <SaudePerfil P={P.saude.perfil} setPerfilCampo={setPerfilSaude} accent={accent} />}
           </>
